@@ -1,0 +1,49 @@
+name: Pad compatibility report
+description: Tell us whether Walkpad works with your walking pad or treadmill
+title: "[Pad] <model>: works / partly works / doesn't work"
+labels: ["compatibility"]
+body:
+  - type: input
+    id: model
+    attributes:
+      label: Pad model
+      placeholder: e.g. Sperax P2 MAX
+    validations:
+      required: true
+  - type: input
+    id: bt-name
+    attributes:
+      label: Bluetooth name
+      description: Shown on the Pad tab once connected, or in your phone's Bluetooth settings.
+      placeholder: e.g. SPERAX_P2MAX
+  - type: input
+    id: protocol
+    attributes:
+      label: Protocol shown in the app
+      description: The small label above the pad name on the Pad tab once connected.
+      placeholder: e.g. FTMS + Sperax
+  - type: checkboxes
+    id: works
+    attributes:
+      label: What worked?
+      options:
+        - label: Connecting
+        - label: Start / countdown
+        - label: Changing speed
+        - label: Pause and resume
+        - label: Stop
+        - label: Steps
+        - label: Distance and time
+        - label: Calories
+        - label: Vibration (if your pad has it)
+        - label: Workout synced to Health Connect
+  - type: textarea
+    id: notes
+    attributes:
+      label: What didn't work, or anything odd?
+      description: Error messages, wrong numbers, screenshots.
+  - type: input
+    id: phone
+    attributes:
+      label: Phone and Android version
+      placeholder: e.g. Pixel 8, Android 16

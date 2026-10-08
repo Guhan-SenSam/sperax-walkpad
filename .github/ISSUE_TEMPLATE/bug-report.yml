@@ -1,0 +1,32 @@
+name: Bug report
+description: Something isn't working
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you expected, what happened instead, and any error text.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Connect to the pad
+        2. Start a walk
+        3. ...
+  - type: input
+    id: pad
+    attributes:
+      label: Pad model
+  - type: input
+    id: phone
+    attributes:
+      label: Phone and Android version
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: Shown at the bottom of Settings.

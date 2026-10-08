@@ -1,118 +1,115 @@
-# Walkpad
+# Sperax Walkpad
 
-An open-source Android app for **Sperax walking pads** and other Bluetooth treadmills. It is a replacement for the SPX Fitness app, which stopped working when the manufacturer shut down its servers and left owners locked out of their pads.
+**An open-source replacement for the SPX Fitness app, for Sperax walking pads.**
 
-- **Pad control:** start, pause, stop, speed and vibration.
-- **Live stats:** steps, time, distance and calories.
-- **Workouts:** saved on the phone and synced to **Health Connect**, which Health Sync, Google Fit and Samsung Health can read.
-- **No account:** fully offline, with no servers involved.
+Sperax shut down the servers behind the SPX Fitness app, and owners were locked out of pads they had paid for. Walkpad talks to the pad directly over Bluetooth, so it needs no account, no server and no internet connection.
 
-> Not affiliated with Sperax. The protocols were reverse engineered from the SPX Fitness Android app for interoperability, so owners can keep using hardware they bought.
+<p align="center">
+  <img src="docs/screenshots/pad.png" width="200" alt="Pad screen showing a 3D model of the walking pad while walking" />
+  <img src="docs/screenshots/workout.png" width="200" alt="Full-screen workout controls with large buttons" />
+  <img src="docs/screenshots/activity.png" width="200" alt="Activity screen with daily step goal and weekly chart" />
+  <img src="docs/screenshots/settings.png" width="200" alt="Settings screen with Health Connect and feedback options" />
+</p>
 
-## Supported pads
-
-| Pad | Protocol | Status |
-|---|---|---|
-| Sperax RM01 (Bluetooth name `SPERAX_RM01`), walking + vibration | Sperax UART on `FFF0` | ✅ Verified on hardware |
-| Sperax `SPERAX_RM-01`, P2 MAX, P3 MAX, P3 PRO, F1, L400, L400B | FTMS + Sperax extension | ⚠️ From the decompiled app; untested |
-| Other FTMS treadmills (Bluetooth service `0x1826`) | FTMS | ⚠️ Spec-based; untested |
-
-If you own one of the untested pads, please open an issue saying whether it works.
-
-The app picks a protocol after connecting by looking at the pad's Bluetooth services (`src/drivers/index.ts`). To add a pad, implement `PadDriver` in `src/drivers/`.
+> **Not affiliated with Sperax.** The pad protocols were reverse engineered for interoperability, so people can keep using hardware they own. No code from the SPX Fitness app is included here.
 
 ## Features
 
-- **Pad tab:** an animated 3D view of the pad that shows its state, live stats, target speed and vibration.
-- **Full-screen workout view:** huge buttons for use mid-walk. It keeps the screen on, and can open automatically when the belt starts.
-- **Activity tab:** daily step goal ring, steps for the last 7 days, totals and history. Walks the app missed can be added by hand (`walkpad://add-workout?...` opens the form pre-filled).
-- **Settings tab:**
-  - Health Connect: link, auto-sync, sync now, re-send all.
-  - Sounds and haptics.
-  - Units, step goal, starting speed and keep-screen-on.
-  - Demo mode, which previews the app without a pad and never saves or syncs anything.
-- **Intro:** a short walkthrough on first launch.
+- **Control your pad:** start, pause, resume, stop, set the speed, and use vibration on pads that have it.
+- **Live stats:** steps, time, distance, calories and speed, shown on an animated 3D model of your pad.
+- **Full-screen workout view:** large buttons that are easy to hit while you walk, with the screen kept on.
+- **Workouts saved automatically:** pauses don't split a workout, and a walk is still saved if the app is closed mid-workout.
+- **Health Connect sync:** steps, distance, calories and a walking session go to Health Connect, so Health Sync, Google Fit, Samsung Health and others can read them.
+- **Activity history:** a daily step goal, a 7-day chart, totals, and walks you can add by hand.
+- **Sounds and haptics:** tones for the countdown, speed changes, pause and stop. They mix with your music instead of pausing it.
+- **Demo mode:** try the app without a pad.
+
+## Supported pads
+
+| Pad | Status |
+|---|---|
+| Sperax RM01 walking + vibration pad (Bluetooth name `SPERAX_RM01`) | ✅ Works, tested on a real pad |
+| Sperax `SPERAX_RM-01` (hyphenated), P2 MAX, P3 MAX, P3 PRO, F1, L400, L400B | 🧪 Should work, needs testers |
+| Other brands' treadmills that support Bluetooth FTMS | 🧪 Should work, needs testers |
+
+**Own one of the 🧪 pads?** Please [report whether it works](../../issues/new?template=pad-report.yml). It takes two minutes, and it's the most useful thing you can do for this project.
 
 ## Install
 
+### Download
+
+Prebuilt APKs will be posted on the [Releases](../../releases) page. To install one, download the `.apk` on your Android phone, open it, and allow installing from this source when asked.
+
+### Build from source
+
+You need Node.js 20 or newer, JDK 17 and the Android SDK.
+
 ```bash
+git clone https://github.com/Guhan-SenSam/sperax-walkpad.git
+cd sperax-walkpad
 npm install
-npx expo prebuild --platform android      # only needed if android/ is missing
-npm run build:apk                         # -> android/app/build/outputs/apk/release/app-release.apk
+npx expo prebuild --platform android
+npm run build:apk
 adb install -r android/app/build/outputs/apk/release/app-release.apk
 ```
 
-The release APK is signed with the debug key, which is fine for sideloading. To install it, either connect the phone with USB debugging enabled and run `adb install`, or copy the APK to the phone and open it.
+The release build is signed with a debug key, which is fine for sideloading. For a store release, set up your own signing key.
 
-`npm test` runs the parser and tracker tests. The Sperax UART tests use frames captured from a real pad; the FTMS tests use packets built from the spec.
+**Requirements:** Android 8.0 or newer with Bluetooth LE. Health Connect is built into Android 14 and newer; on older versions, install it from the Play Store.
 
-## Workouts and Health Connect
+## Using it
 
-- **When a workout is saved:** it starts when the belt starts. It ends as soon as the belt stops after you press Stop in the app. If the pad stops some other way (its remote, for example), the workout ends after the belt has been stopped for 30 seconds, or when the app disconnects. The workout in progress is saved every few seconds, so closing the app doesn't lose it. A pause never ends a workout, however long it lasts. If you stop and start again within 30 seconds, the app adds the runs together, because the pad resets its counters after a stop.
-- **Discarded workouts:** anything under 15 seconds with no steps is dropped.
-- **Storage:** workouts are saved on the phone with AsyncStorage. Long-press a workout to delete it from the app; this does not remove it from Health Connect.
-- **Health Connect:** tap **Link Health Connect** once. After that, each finished workout is written as Steps, Distance, Active calories and a Walking exercise session. Health Sync, Google Fit and Samsung Health can read it from there.
-- **No duplicates:** every record has a stable `clientRecordId`, so re-syncing a workout does not create duplicates.
+1. Switch on your pad, and make sure no other phone is connected to it. Pads accept only one connection at a time.
+2. Open Walkpad and tap **Connect**. The pad is found automatically.
+3. Pick a speed and tap **Start**. The pad counts down 3-2-1, then ramps up to your speed.
+4. Tap the expand icon for the full-screen controls.
+5. To share your steps, go to **Settings → Link Health Connect**.
 
-## Protocol: Sperax UART (RM01)
+### How workouts are recorded
 
-The protocol was reverse engineered from `com.spreax.fitness202412` (a Flutter app, decompiled with blutter) and verified against a real pad. The pad advertises as `SPERAX_RM01`, and its BLE module is a Wi-Link WLT6200.
+- **Start:** a workout starts when the belt starts.
+- **Pausing** never ends a workout.
+- **Stopping:** pressing **Stop** in the app saves the workout as soon as the belt stops. If the pad is stopped another way (its remote, for example), the workout is saved after the belt has been stopped for 30 seconds, or when the app disconnects.
+- **Closing the app:** the workout in progress is saved every few seconds, so closing the app doesn't lose it.
+- **Very short walks:** anything under 15 seconds with no steps is discarded as an accidental start.
+- **Health Connect:** each record has a stable ID, so re-syncing never creates duplicates. Deleting a workout in the app does not delete it from Health Connect.
 
-| | UUID |
-|---|---|
-| Service | `0000fff0-0000-1000-8000-00805f9b34fb` |
-| Write (no response) | `0000fff2-…` |
-| Notify | `0000fff1-…` |
+## Development
 
-### Framing
+```bash
+npm test          # protocol, FTMS and workout-tracker tests (no device needed)
+npx tsc --noEmit  # typecheck
+npx expo lint     # lint
+```
+
+To work on the UI without a pad, in an emulator for example, turn on **Demo mode** in Settings.
+
+### Project layout
 
 ```
-F5 <len> 00 <payload…> <crcLo> <crcHi> FA
+src/
+  app/            Screens (Expo Router): tabs, full-screen workout, onboarding, add workout
+  drivers/        One driver per pad protocol, picked automatically after connecting
+  protocol.ts     Sperax UART framing, CRC and status parsing
+  tracker.ts      Turns the pad's counters into whole workouts
+  health.ts       Health Connect permissions and writes
+  AppProvider.tsx Shared state: connection, workouts, settings, feedback
+docs/PROTOCOL.md  Byte-level protocol documentation
+scripts/          Tests and the sound generator
 ```
 
-- `len` is the total frame length.
-- The CRC is CRC-16 with init `0xFFFF` and reflected polynomial **`0xA327`**, computed over `F5 … payload`.
-- The pad escapes inner `0xFn` bytes as `F0 0n` in its own frames, and `len` counts the escaped bytes.
-- Send frames **unescaped**. The pad rejects escaped input with `0E 04`.
+### Adding a pad
 
-### Commands (payload)
+1. Implement `PadDriver` (`src/drivers/types.ts`) in a new file in `src/drivers/`.
+2. Register it in `pickDriver` in `src/drivers/index.ts`. Drivers are matched on the Bluetooth services the pad exposes.
+3. Add tests with packets captured from the real device.
 
-| Action | Payload |
-|---|---|
-| Status poll | `19` |
-| Lifetime totals | `1A` |
-| Start belt (3-2-1 countdown) | `15 01 02 00` |
-| Set speed | `15 01 <km/h × 10> 00` |
-| Pause | `15 02 00 00` |
-| Stop | `15 00 00 00` |
-| Vibration on / set level | `16 01 <level>` (levels 1–9 verified) |
-| Vibration off | `16 00 00` |
+[docs/PROTOCOL.md](docs/PROTOCOL.md) documents the existing protocols and is a good starting point. A Python [bleak](https://github.com/hbldh/bleak) script is the quickest way to capture packets from a pad.
 
-The pad acknowledges each control command with `D0 <cmd> …`.
+## Contributing
 
-### Status frame (`19`), byte offsets in the unescaped frame
+Contributions are welcome, especially compatibility reports and drivers for other pads. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-| Bytes | Meaning |
-|---|---|
-| 6 | State: `00` idle, `13/12/11` countdown 3/2/1, `10` running, `0F` slowing down, `01` paused (counters kept, start resumes), `50` vibrating |
-| 8 | Unit (`01` = metric) |
-| 9–10 | Elapsed seconds (big-endian) |
-| 11–12 | Distance in units of 10 m (big-endian) |
-| 13–14 | Calories (big-endian) |
-| 15–16 | Steps from the pad's footfall sensor (big-endian) |
-| 17 | Current speed in 0.1 km/h (the pad ramps gradually to the target) |
-| 20 | Vibration level |
+## License
 
-## Protocol: FTMS + Sperax extension
-
-Standard [Fitness Machine Service](https://www.bluetooth.com/specifications/specs/fitness-machine-service-1-0/) (`0x1826`):
-
-- **Treadmill Data (`2ACD`):** speed, distance, energy and elapsed time.
-- **Machine Status (`2ADA`):** start, pause and stop events.
-- **Control Point (`2AD9`):** request control `00`, start `07`, stop `08 01`, pause `08 02`, set speed `02 <u16 LE, 0.01 km/h>`.
-- **Speed range:** read from Supported Speed Range (`2AD4`).
-
-Sperax models add a vendor service, `FFF0`:
-
-- **`FFF3` (notify):** `[_, 02, lo, hi]` is the step count, and `[_, 01, state, level]` is the vibration state (`state` 1 = on, 2 = off).
-- **`FFF2` (write):** vibration on or set level `F0 01 01 <level>`, vibration off `F0 01 02`.
+[MIT](LICENSE) © Guhan Sensam

@@ -1,5 +1,5 @@
 {
-  "name": "spx-walkpad",
+  "name": "sperax-walkpad",
   "version": "1.0.0",
   "main": "expo-router/entry",
   "dependencies": {
@@ -42,5 +42,11 @@
     "build:apk": "cd android && ./gradlew assembleRelease",
     "lint": "expo lint"
   },
-  "private": true
+  "private": true,
+  "license": "MIT",
+  "description": "Open-source Android app for Sperax walking pads and FTMS treadmills, with Health Connect sync",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Guhan-SenSam/sperax-walkpad.git"
+  }
 }
