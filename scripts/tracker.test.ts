@@ -39,4 +39,36 @@ const tr3 = new WorkoutTracker();
 tr3.update(status('running', 120, 200, 0.1, 6), at(120));
 assert.equal(tr3.finish(at(121))?.steps, 200);
 
+// Pausing keeps the workout open indefinitely; the pad keeps its counters while paused.
+const tr4 = new WorkoutTracker();
+tr4.update(status('running', 300, 650, 0.2, 20), at(300));
+tr4.update(status('paused', 302, 650, 0.2, 20), at(302));
+assert.equal(tr4.update(status('paused', 302, 650, 0.2, 20), at(302) + 10 * 60_000), null);
+tr4.update(status('countdown', 302, 650, 0.2, 20), at(1000));
+tr4.update(status('running', 600, 1000, 0.4, 35), at(1300));
+assert.equal(tr4.finish(at(1301))?.steps, 1000);
+
+// Pressing Stop ends the workout on the first idle update, without the grace period.
+const tr5 = new WorkoutTracker();
+tr5.update(status('running', 100, 150, 0.1, 5), at(100));
+tr5.stopRequested();
+assert.equal(tr5.update(status('stopping', 102, 152, 0.1, 5), at(102)), null);
+assert.equal(tr5.update(status('idle'), at(105))?.steps, 152);
+
+// A saved snapshot resumes the workout after an app restart.
+const tr6 = new WorkoutTracker();
+tr6.update(status('running', 20, 300, 0.15, 9), at(200));
+const snap = JSON.parse(JSON.stringify(tr6.snapshot()));
+const tr7 = new WorkoutTracker();
+tr7.restore(snap);
+tr7.update(status('running', 80, 380, 0.19, 11), at(260)); // still walking: continues
+assert.equal(tr7.current?.steps, 380);
+// Restored while the pad is idle and the grace period has passed: ends at last activity.
+const tr8 = new WorkoutTracker();
+tr8.restore(snap);
+const recovered = tr8.update(status('idle'), at(200) + IDLE_GRACE_MS + 5000);
+assert.equal(recovered?.steps, 300);
+// Ends at last activity (start + the pad's 20 s of elapsed time).
+assert.equal(recovered?.endTime, new Date(at(220)).toISOString());
+
 console.log('tracker tests passed');

@@ -59,6 +59,7 @@ export type PadState =
   | 'idle'
   | 'countdown'
   | 'running'
+  | 'paused'
   | 'stopping'
   | 'vibrating'
   | 'unknown';
@@ -79,6 +80,7 @@ function stateFromCode(code: number): PadState {
   if (code === 0x00) return 'idle';
   if (code >= 0x11 && code <= 0x13) return 'countdown';
   if (code === 0x10) return 'running';
+  if (code === 0x01) return 'paused'; // counters are kept; start resumes
   if (code === 0x0f) return 'stopping';
   if (code === 0x50) return 'vibrating';
   return 'unknown';

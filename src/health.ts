@@ -20,6 +20,7 @@ const PERMISSIONS: Permission[] = [
 ];
 
 const RECORDING_METHOD_ACTIVELY_RECORDED = 1;
+const RECORDING_METHOD_MANUAL_ENTRY = 3;
 
 let ready: Promise<boolean> | null = null;
 
@@ -64,7 +65,7 @@ export async function syncWorkout(w: Workout): Promise<void> {
   const metadata = (kind: string) => ({
     clientRecordId: `spx-walkpad-${w.id}-${kind}`,
     clientRecordVersion: w.version ?? 0,
-    recordingMethod: RECORDING_METHOD_ACTIVELY_RECORDED,
+    recordingMethod: w.manual ? RECORDING_METHOD_MANUAL_ENTRY : RECORDING_METHOD_ACTIVELY_RECORDED,
     device: { manufacturer: 'Sperax', model: 'RM-01' },
   });
   const time = { startTime: w.startTime, endTime: w.endTime };

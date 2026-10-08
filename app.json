@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Walking Pad",
+    "name": "Walkpad",
     "slug": "spx-walkpad",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -46,7 +46,11 @@
             "targetSdkVersion": 36
           }
         }
-      ]
-    ]
+      ],
+      "expo-font",
+      "expo-router",
+      "expo-audio"
+    ],
+    "scheme": "walkpad"
   }
 }

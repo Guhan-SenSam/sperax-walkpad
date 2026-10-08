@@ -1,18 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PermissionsAndroid, Platform } from 'react-native';
 import { BleManager, Device, Subscription } from 'react-native-ble-plx';
-import {
-  PadCommands,
-  FrameParser,
-  NOTIFY_UUID,
-  PadStatus,
-  SERVICE_UUID,
-  WRITE_UUID,
-  parseStatus,
-} from './protocol';
 import { fromBase64, toBase64 } from './base64';
+import { Capabilities, PadDriver, SCAN_SERVICES, Transport, pickDriver } from './drivers';
+import type { PadStatus } from './protocol';
 
 export type Connection = 'disconnected' | 'scanning' | 'connecting' | 'connected';
+
+export interface PadInfo {
+  name: string;
+  protocol: string;
+  capabilities: Capabilities;
+}
 
 const POLL_MS = 1000;
 const SCAN_TIMEOUT_MS = 15000;
@@ -32,9 +31,10 @@ async function requestPermissions(): Promise<boolean> {
   return perms.every((p) => result[p] === PermissionsAndroid.RESULTS.GRANTED);
 }
 
-function isPad(d: Device) {
-  const name = d.name ?? d.localName ?? '';
-  return name.toUpperCase().startsWith('SPERAX');
+function looksLikePad(d: Device) {
+  const name = (d.name ?? d.localName ?? '').toUpperCase();
+  const services = (d.serviceUUIDs ?? []).map((u) => u.toLowerCase());
+  return name.startsWith('SPERAX') || SCAN_SERVICES.some((s) => services.includes(s));
 }
 
 export interface PadEvents {
@@ -44,11 +44,12 @@ export interface PadEvents {
 
 export function usePad(events: PadEvents = {}) {
   const [connection, setConnection] = useState<Connection>('disconnected');
-  const [deviceName, setDeviceName] = useState<string | null>(null);
+  const [info, setInfo] = useState<PadInfo | null>(null);
   const [status, setStatus] = useState<PadStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const device = useRef<Device | null>(null);
+  const driver = useRef<PadDriver | null>(null);
   const subs = useRef<Subscription[]>([]);
   const poll = useRef<ReturnType<typeof setInterval> | null>(null);
   const scanTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -65,29 +66,49 @@ export function usePad(events: PadEvents = {}) {
     subs.current.forEach((s) => s.remove());
     subs.current = [];
     device.current = null;
+    driver.current = null;
   }, []);
 
-  const send = useCallback(async (frame: number[]) => {
-    const d = device.current;
+  /** Runs a driver command, surfacing BLE errors in the UI. */
+  const run = useCallback((fn: (d: PadDriver) => Promise<void>) => {
+    const d = driver.current;
     if (!d) return;
-    try {
-      await d.writeCharacteristicWithoutResponseForService(
-        SERVICE_UUID,
-        WRITE_UUID,
-        toBase64(frame),
-      );
-    } catch (e: any) {
-      setError(`Write failed: ${e?.message ?? e}`);
-    }
+    fn(d).catch((e: any) => setError(`Command failed: ${e?.message ?? e}`));
   }, []);
 
   const attach = useCallback(
-    async (d: Device) => {
+    async (found: Device) => {
       setConnection('connecting');
-      setDeviceName(d.name ?? d.localName ?? d.id);
-      const connected = await d.connect({ timeout: 15000 });
+      const connected = await found.connect({ timeout: 15000 });
       await connected.discoverAllServicesAndCharacteristics();
       device.current = connected;
+
+      const gatt = new Map<string, Set<string>>();
+      for (const svc of await connected.services()) {
+        const chars = await svc.characteristics();
+        gatt.set(svc.uuid.toLowerCase(), new Set(chars.map((c) => c.uuid.toLowerCase())));
+      }
+      const d = pickDriver(gatt);
+      if (!d) throw new Error('This device does not look like a supported walking pad');
+
+      const transport: Transport = {
+        write: async (service, characteristic, bytes, withResponse) => {
+          const value = toBase64(bytes);
+          if (withResponse) await connected.writeCharacteristicWithResponseForService(service, characteristic, value);
+          else await connected.writeCharacteristicWithoutResponseForService(service, characteristic, value);
+        },
+        read: async (service, characteristic) => {
+          const c = await connected.readCharacteristicForService(service, characteristic);
+          return c.value ? fromBase64(c.value) : [];
+        },
+        monitor: (service, characteristic, onData) => {
+          subs.current.push(
+            connected.monitorCharacteristicForService(service, characteristic, (err, c) => {
+              if (!err && c?.value) onData(fromBase64(c.value));
+            }),
+          );
+        },
+      };
 
       subs.current.push(
         manager.onDeviceDisconnected(connected.id, () => {
@@ -98,24 +119,23 @@ export function usePad(events: PadEvents = {}) {
         }),
       );
 
-      const parser = new FrameParser();
-      subs.current.push(
-        connected.monitorCharacteristicForService(SERVICE_UUID, NOTIFY_UUID, (err, ch) => {
-          if (err || !ch?.value) return;
-          for (const frame of parser.push(fromBase64(ch.value))) {
-            const s = parseStatus(frame);
-            if (s) {
-              setStatus(s);
-              handlers.current.onStatus?.(s);
-            }
-          }
-        }),
-      );
-
-      poll.current = setInterval(() => send(PadCommands.status()), POLL_MS);
+      await d.attach(transport, (s) => {
+        setStatus(s);
+        handlers.current.onStatus?.(s);
+      });
+      driver.current = d;
+      if (d.poll) {
+        const p = d.poll.bind(d);
+        poll.current = setInterval(() => p().catch(() => {}), POLL_MS);
+      }
+      setInfo({
+        name: connected.name ?? found.localName ?? connected.id,
+        protocol: d.protocol,
+        capabilities: { ...d.capabilities },
+      });
       setConnection('connected');
     },
-    [cleanup, send],
+    [cleanup],
   );
 
   const connect = useCallback(async () => {
@@ -133,7 +153,7 @@ export function usePad(events: PadEvents = {}) {
     scanTimer.current = setTimeout(() => {
       manager.stopDeviceScan();
       setConnection('disconnected');
-      setError('Pad not found. Is it powered on and not connected to another phone?');
+      setError('No pad found. Is it powered on and not connected to another phone?');
     }, SCAN_TIMEOUT_MS);
 
     manager.startDeviceScan(null, null, (err, d) => {
@@ -144,11 +164,13 @@ export function usePad(events: PadEvents = {}) {
         setError(`Scan failed: ${err.message}`);
         return;
       }
-      if (!d || !isPad(d)) return;
+      if (!d || !looksLikePad(d)) return;
       manager.stopDeviceScan();
       if (scanTimer.current) clearTimeout(scanTimer.current);
       attach(d).catch((e) => {
+        const dev = device.current;
         cleanup();
+        dev?.cancelConnection().catch(() => {});
         setConnection('disconnected');
         setError(`Connect failed: ${e?.message ?? e}`);
       });
@@ -169,16 +191,16 @@ export function usePad(events: PadEvents = {}) {
 
   return {
     connection,
-    deviceName,
+    info,
     status,
     error,
     connect,
     disconnect,
-    start: () => send(PadCommands.start()),
-    pause: () => send(PadCommands.pause()),
-    stop: () => send(PadCommands.stop()),
-    setSpeed: (kmh: number) => send(PadCommands.setSpeed(kmh)),
-    vibrate: (level: number) => send(PadCommands.vibrate(level)),
-    stopVibration: () => send(PadCommands.stopVibration()),
+    start: () => run((d) => d.start()),
+    pause: () => run((d) => d.pause()),
+    stop: () => run((d) => d.stop()),
+    setSpeed: (kmh: number) => run((d) => d.setSpeed(kmh)),
+    vibrate: (level: number) => run((d) => d.vibrate(level)),
+    stopVibration: () => run((d) => d.stopVibration()),
   };
 }
