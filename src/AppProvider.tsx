@@ -10,9 +10,9 @@ import { useDemo } from './useDemo';
 import { usePad } from './usePad';
 import { useWorkouts } from './useWorkouts';
 
-export const SPEED_STEP = 0.5;
+export const SPEED_STEP = 0.1;
 
-// Used before a pad is connected (and in demo mode): the verified RM01 limits.
+// App safety bounds; the 6 km/h ceiling is not a verified hardware maximum.
 const DEFAULT_CAPS: Capabilities = {
   vibration: true,
   maxVibrationLevel: MAX_VIBRATION_LEVEL,

@@ -38,6 +38,7 @@ export class SperaxUartDriver implements PadDriver {
         if (s) onStatus(s);
       }
     });
+    await this.send(PadCommands.initialize()).catch(() => {});
   }
 
   private send(frame: number[]) {

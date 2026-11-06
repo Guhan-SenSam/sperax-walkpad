@@ -35,7 +35,7 @@ export default function WorkoutScreen() {
         </Text>
         <Eyebrow color={accent}>Steps</Eyebrow>
         <View style={styles.subStats}>
-          <SubStat value={live.value} unit={live.unit} label="Speed" />
+          <SubStat value={s ? live.value : '--'} unit={live.unit} label="Confirmed speed" />
           <SubStat value={dist.value} unit={dist.unit} label="Distance" />
           <SubStat value={String(totals?.calories ?? 0)} unit="kcal" label="Calories" />
         </View>
@@ -53,7 +53,7 @@ export default function WorkoutScreen() {
             </BigButton>
             <View style={styles.targetBox}>
               <Text style={styles.target}>{tgt.value}</Text>
-              <Eyebrow>target {tgt.unit}</Eyebrow>
+              <Eyebrow>requested {tgt.unit}</Eyebrow>
             </View>
             <BigButton
               onPress={() => actions.changeTarget(target + SPEED_STEP)}

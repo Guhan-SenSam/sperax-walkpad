@@ -78,8 +78,8 @@ export function PadModel({ state, accent, speedKmh, vibrationLevel, displayText 
   const vibrating = state === 'vibrating';
   const lit = state !== 'offline';
   const moving = (state === 'running' || state === 'stopping') && speedKmh > 0;
-  // Snap speed to 0.5 km/h steps so the animation doesn't restart on every tick.
-  const beltSpeed = moving ? Math.max(0.5, Math.round(speedKmh * 2) / 2) : 0;
+  // Snap to the treadmill's observed 0.1 km/h command resolution.
+  const beltSpeed = moving ? Math.max(0.1, Math.round(speedKmh * 10) / 10) : 0;
 
   useEffect(() => {
     cancelAnimation(tread);
