@@ -13,17 +13,12 @@ import { colors, fonts, stateAccent, stateLabel } from '../../theme';
 const modelName = (name: string) => name.replace(/^SPERAX[_ -]*/i, '') || name;
 
 export default function PadScreen() {
-  const { pad, demo, status: s, state, accent, totals, caps, minSpeed, target, actions, settings, connected } = useApp();
+  const { pad, demo, status: s, state, accent, totals, caps, target, actions, settings, connected } = useApp();
   const units = settings.units;
   const walking = state === 'running' || state === 'countdown';
   const canVibrate = connected && (state === 'idle' || state === 'vibrating' || state === 'unknown');
-  const vibrationLevel = state === 'vibrating' ? s!.vibrationLevel : 0;
+  const vibrationLevel = state === 'vibrating' ? (s?.vibrationLevel ?? 0) : 0;
   const levels = caps.maxVibrationLevel;
-  const speedSteps = Math.round((caps.maxSpeed - minSpeed) / SPEED_STEP) + 1;
-  const speedLabels = Array.from({ length: speedSteps }, (_, i) => {
-    const v = minSpeed + i * SPEED_STEP;
-    return Number.isInteger(v) && (speedSteps <= 13 || v % 2 === 0) ? String(v) : '';
-  });
   const live = speed(s?.speedKmh ?? 0, units);
   const tgt = speed(target, units);
   const dist = totals ? distance(totals.distanceKm, units) : null;
@@ -39,7 +34,9 @@ export default function PadScreen() {
           ? 'Press resume to continue'
           : state === 'countdown'
             ? 'Get ready'
-            : `${live.value} ${live.unit}`;
+            : s
+              ? `Confirmed ${live.value} ${live.unit}`
+              : 'Waiting for treadmill data';
 
   return (
     <Screen accent={accent}>
@@ -74,7 +71,7 @@ export default function PadScreen() {
           accent={accent}
           speedKmh={s?.speedKmh ?? 0}
           vibrationLevel={vibrationLevel}
-          displayText={state === 'offline' ? '--' : state === 'vibrating' ? `L${vibrationLevel}` : live.value}
+          displayText={state === 'offline' ? '--' : state === 'vibrating' ? `L${s?.vibrationLevel ?? '?'}` : live.value}
         />
         {s?.countdown != null && state === 'countdown' && (
           <View style={styles.overlay} pointerEvents="none">
@@ -109,7 +106,10 @@ export default function PadScreen() {
 
       <Panel>
         <View style={styles.rowBetween}>
-          <Eyebrow>Target speed</Eyebrow>
+          <Eyebrow>Requested target</Eyebrow>
+          <Eyebrow color={s ? accent : colors.faint}>
+            Confirmed {s ? `${live.value} ${live.unit}` : '--'}
+          </Eyebrow>
           <Pressable onPress={() => router.push('/workout')} disabled={!connected} hitSlop={8}>
             <Eyebrow color={connected ? accent : colors.faint}>Full screen ›</Eyebrow>
           </Pressable>
@@ -122,14 +122,6 @@ export default function PadScreen() {
           </View>
           <IconButton label="+" accent={accent} disabled={!connected} onPress={() => actions.changeTarget(target + SPEED_STEP)} />
         </View>
-        <SegmentTrack
-          count={speedSteps}
-          value={Math.round((target - minSpeed) / SPEED_STEP) + 1}
-          onSelect={(i) => actions.changeTarget(minSpeed + (i - 1) * SPEED_STEP)}
-          accent={accent}
-          disabled={!connected}
-          labels={units === 'metric' ? speedLabels : undefined}
-        />
         <View style={styles.actions}>
           {walking ? (
             <ActionButton label="Pause" color={stateAccent.paused} onPress={actions.pause} disabled={!connected} flex={1} />
@@ -152,7 +144,7 @@ export default function PadScreen() {
           <View style={styles.rowBetween}>
             <Eyebrow>Vibration</Eyebrow>
             <Eyebrow color={state === 'vibrating' ? accent : colors.muted}>
-              {state === 'vibrating' ? `Level ${vibrationLevel}` : canVibrate ? 'Off' : 'Stop the belt first'}
+              {state === 'vibrating' ? `Level ${s?.vibrationLevel ?? '?'}` : canVibrate ? 'Off' : 'Stop the belt first'}
             </Eyebrow>
           </View>
           <SegmentTrack

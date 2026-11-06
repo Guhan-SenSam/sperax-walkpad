@@ -21,7 +21,7 @@ export interface PadDriver {
   readonly capabilities: Capabilities;
   /** Subscribe to notifications and do any handshake. */
   attach(t: Transport, onStatus: (s: PadStatus) => void): Promise<void>;
-  /** Called every second while connected (for pads that must be polled). */
+  /** Called periodically while connected (for pads that must be polled). */
   poll?(): Promise<void>;
   start(): Promise<void>;
   pause(): Promise<void>;

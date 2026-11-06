@@ -71,4 +71,54 @@ assert.equal(recovered?.steps, 300);
 // Ends at last activity (start + the pad's 20 s of elapsed time).
 assert.equal(recovered?.endTime, new Date(at(220)).toISOString());
 
+// The pad can report its previous elapsed counter while idle; count only the delta for this walk.
+const tr9 = new WorkoutTracker();
+tr9.update(status('idle', 899), at(3000));
+tr9.update(status('countdown', 899), at(3001));
+tr9.update(status('running', 920, 10, 0.02, 1), at(3022));
+assert.deepEqual(tr9.current, { seconds: 21, distanceKm: 0.02, steps: 10, calories: 1 });
+tr9.update(status('stopping', 922, 12, 0.02, 1), at(3024));
+tr9.stopRequested();
+const tr9Done = tr9.update(status('idle', 922, 12, 0.02, 1), at(3025));
+assert.equal(tr9Done?.seconds, 23);
+assert.equal(tr9Done?.steps, 12);
+
+// A second workout after idle starts from the new idle baseline, not the previous walk's counters.
+tr9.update(status('idle', 922, 12, 0.02, 1), at(3030));
+tr9.update(status('countdown', 922, 12, 0.02, 1), at(3031));
+tr9.update(status('running', 932, 15, 0.03, 2), at(3041));
+assert.deepEqual(tr9.current, { seconds: 10, distanceKm: 0.01, steps: 3, calories: 1 });
+
+// If the device resets counters during an open workout, the prior segment is retained once.
+const tr10 = new WorkoutTracker();
+tr10.update(status('idle', 100), at(4000));
+tr10.update(status('countdown', 100), at(4001));
+tr10.update(status('running', 110, 20, 0.1, 4), at(4011));
+tr10.update(status('stopping', 112, 22, 0.11, 5), at(4013));
+tr10.update(status('countdown', 0), at(4020));
+tr10.update(status('running', 5, 6, 0.03, 1), at(4025));
+assert.deepEqual(tr10.current, { seconds: 17, distanceKm: 0.14, steps: 28, calories: 6 });
+
+// Some pads clear distance/steps on stop before elapsed seconds roll back; retain the final walking segment.
+const tr11 = new WorkoutTracker();
+tr11.update(status('idle', 899, 80, 0.6, 30), at(5000));
+tr11.update(status('countdown', 899, 80, 0.6, 30), at(5001));
+tr11.update(status('running', 909, 90, 0.7, 32), at(5011));
+tr11.update(status('stopping', 909, 0, 0, 0), at(5012));
+assert.deepEqual(tr11.current, { seconds: 10, distanceKm: 0.1, steps: 10, calories: 2 });
+tr11.stopRequested();
+const tr11Done = tr11.update(status('idle', 909, 0, 0, 0), at(5013));
+assert.deepEqual(
+  { seconds: tr11Done?.seconds, distanceKm: tr11Done?.distanceKm, steps: tr11Done?.steps, calories: tr11Done?.calories },
+  { seconds: 10, distanceKm: 0.1, steps: 10, calories: 2 },
+);
+
+// After a disconnect, a manual reconnect starts a separate session from the last known raw counters.
+const tr12 = new WorkoutTracker();
+tr12.update(status('idle', 100), at(6000));
+tr12.update(status('running', 110, 20, 0.1, 4), at(6010));
+assert.equal(tr12.finish(at(6011))?.steps, 20);
+tr12.update(status('running', 115, 24, 0.12, 5), at(6015));
+assert.deepEqual(tr12.current, { seconds: 5, distanceKm: 0.02, steps: 4, calories: 1 });
+
 console.log('tracker tests passed');

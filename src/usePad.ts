@@ -13,7 +13,7 @@ export interface PadInfo {
   capabilities: Capabilities;
 }
 
-const POLL_MS = 1000;
+const POLL_MS = 300;
 const SCAN_TIMEOUT_MS = 15000;
 
 const manager = new BleManager();
